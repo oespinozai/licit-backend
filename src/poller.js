@@ -43,8 +43,8 @@ async function pollLatest() {
         const ocid = release.ocid;
         if (!ocid) continue;
 
-        const existing = db.prepare('SELECT ocid FROM seen_tenders WHERE ocid = ?').get(ocid);
-        if (existing) continue;
+        const existing = db.get('SELECT ocid FROM seen_tenders WHERE ocid = ?', [ocid]);
+        if (existing && existing.ocid) continue;
 
         const tender = release.tender || {};
         const buyer = release.buyer || {};
@@ -53,29 +53,17 @@ async function pollLatest() {
         const amount = (tender.value && tender.value.amount) || (budget.amount && budget.amount.amount) || 0;
         const deadline = (tender.tenderPeriod && tender.tenderPeriod.endDate) || null;
 
-        db.prepare(`
-          INSERT OR IGNORE INTO seen_tenders (ocid, source, title, buyer_name, category, amount, date_published, deadline, procurement_method, department, raw_json)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          ocid,
-          'SEACE V3',
-          tender.title || '',
-          buyer.name || '',
-          mapCategory(tender.mainProcurementCategory),
-          amount,
-          tender.datePublished || null,
-          deadline,
-          tender.procurementMethodDetails || '',
-          extractDepartment(release),
-          JSON.stringify(release)
-        );
+        db.run(`INSERT OR IGNORE INTO seen_tenders (ocid, source, title, buyer_name, category, amount, date_published, deadline, procurement_method, department, raw_json)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [ocid, 'SEACE V3', tender.title || '', buyer.name || '', mapCategory(tender.mainProcurementCategory),
+           amount, tender.datePublished || null, deadline, tender.procurementMethodDetails || '',
+           extractDepartment(release), JSON.stringify(release)]);
 
         newTenders.push(release);
       }
 
       page++;
     }
-
     console.log(`[POLL] Found ${newTenders.length} new tenders`);
     return newTenders;
   } catch (err) {
@@ -84,14 +72,4 @@ async function pollLatest() {
   }
 }
 
-async function pollSingle(ocid) {
-  try {
-    const res = await fetch(`${API_BASE}/record/${ocid}`);
-    if (!res.ok) return null;
-    return await res.json();
-  } catch {
-    return null;
-  }
-}
-
-module.exports = { pollLatest, pollSingle };
+module.exports = { pollLatest };
