@@ -6,6 +6,21 @@ const db = require('./db');
 const { pollLatest } = require('./poller');
 const { processAlerts } = require('./alerts');
 
+const stripeKey = process.env.STRIPE_SECRET_KEY;
+let stripe = null;
+if (stripeKey) {
+  try { stripe = require('stripe')(stripeKey); } catch(e) { console.error('[STRIPE] Init failed:', e.message); }
+}
+
+const PRICE_IDS = {
+  basico_monthly: process.env.PRICE_BASICO_MONTHLY || 'price_1TWNUsJPESNny8hCK6AWlMad',
+  basico_yearly: process.env.PRICE_BASICO_YEARLY || 'price_1TWNUsJPESNny8hCPT2P3ndb',
+  pro_monthly: process.env.PRICE_PRO_MONTHLY || 'price_1TWNUtJPESNny8hCEIRcKfei',
+  pro_yearly: process.env.PRICE_PRO_YEARLY || 'price_1TWNUuJPESNny8hCUCN9w79o',
+  portfolio_monthly: process.env.PRICE_PORTFOLIO_MONTHLY || 'price_1TWNUuJPESNny8hCelCDvjMN',
+  portfolio_yearly: process.env.PRICE_PORTFOLIO_YEARLY || 'price_1TWNUvJPESNny8hCafZnNj1Y',
+};
+
 async function main() {
   await db.ready;
   console.log('[LICIT] Database ready');
@@ -65,6 +80,29 @@ async function main() {
     const tenders = await pollLatest();
     await processAlerts(tenders);
     res.json({ newTenders: tenders.length });
+  });
+
+  app.post('/api/checkout', express.json(), async (req, res) => {
+    if (!stripe) return res.status(500).json({ error: 'Stripe not configured' });
+    const { plan, interval, email, success_url, cancel_url } = req.body;
+    const key = `${plan}_${interval || 'monthly'}`;
+    const priceId = PRICE_IDS[key];
+    if (!priceId) return res.status(400).json({ error: 'Invalid plan/interval' });
+
+    try {
+      const session = await stripe.checkout.sessions.create({
+        mode: 'subscription',
+        line_items: [{ price: priceId, quantity: 1 }],
+        customer_email: email || undefined,
+        success_url: success_url || 'https://oespinozai.github.io/licit/?success=true',
+        cancel_url: cancel_url || 'https://oespinozai.github.io/licit/?canceled=true',
+        metadata: { plan, interval: interval || 'monthly' },
+      });
+      res.json({ url: session.url });
+    } catch (err) {
+      console.error('[STRIPE] Checkout error:', err.message);
+      res.status(500).json({ error: err.message });
+    }
   });
 
   const PORT = process.env.PORT || 3000;

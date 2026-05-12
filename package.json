@@ -17,10 +17,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@stripe/stripe-js": "^9.5.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "node-cron": "^4.2.1",
-    "sql.js": "^1.14.1"
+    "sql.js": "^1.14.1",
+    "stripe": "^22.1.1"
   }
 }
