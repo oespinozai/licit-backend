@@ -13,12 +13,12 @@ if (stripeKey) {
 }
 
 const PRICE_IDS = {
-  basico_monthly: process.env.PRICE_BASICO_MONTHLY || 'price_1TWNUsJPESNny8hCK6AWlMad',
-  basico_yearly: process.env.PRICE_BASICO_YEARLY || 'price_1TWNUsJPESNny8hCPT2P3ndb',
-  pro_monthly: process.env.PRICE_PRO_MONTHLY || 'price_1TWNUtJPESNny8hCEIRcKfei',
-  pro_yearly: process.env.PRICE_PRO_YEARLY || 'price_1TWNUuJPESNny8hCUCN9w79o',
-  portfolio_monthly: process.env.PRICE_PORTFOLIO_MONTHLY || 'price_1TWNUuJPESNny8hCelCDvjMN',
-  portfolio_yearly: process.env.PRICE_PORTFOLIO_YEARLY || 'price_1TWNUvJPESNny8hCafZnNj1Y',
+  basico_monthly: process.env.PRICE_BASICO_MONTHLY || 'price_1TWNgMJPESNny8hCeyVky8vl',
+  basico_yearly: process.env.PRICE_BASICO_YEARLY || 'price_1TWNgMJPESNny8hCeyVky8vl',
+  pro_monthly: process.env.PRICE_PRO_MONTHLY || 'price_1TWNgNJPESNny8hCcdGeLzzv',
+  pro_yearly: process.env.PRICE_PRO_YEARLY || 'price_1TWNgNJPESNny8hCcdGeLzzv',
+  portfolio_monthly: process.env.PRICE_PORTFOLIO_MONTHLY || 'price_1TWNgNJPESNny8hC998Ii9gU',
+  portfolio_yearly: process.env.PRICE_PORTFOLIO_YEARLY || 'price_1TWNgNJPESNny8hC998Ii9gU',
 };
 
 async function main() {
@@ -50,6 +50,38 @@ async function main() {
     const tender = db.get('SELECT * FROM seen_tenders WHERE ocid = ?', [req.params.ocid]);
     if (!tender || !tender.ocid) return res.status(404).json({ error: 'Not found' });
     res.json(tender);
+  });
+
+  app.get('/api/awards/recent', (req, res) => {
+    const limit = parseInt(req.query.limit) || 20;
+    const all = db.all('SELECT ocid, source, title, buyer_name, category, amount, date_published, deadline, procurement_method, department, raw_json FROM seen_tenders ORDER BY first_seen_at DESC LIMIT 500', []);
+    const awards = [];
+    for (const t of all) {
+      try {
+        const raw = JSON.parse(t.raw_json || '{}');
+        const tags = raw.tag || [];
+        const isAward = tags.some(tag => tag === 'award' || tag === 'contract');
+        if (!isAward) continue;
+        const pubDate = t.date_published || raw.date;
+        const consentDate = pubDate ? new Date(new Date(pubDate).getTime() + 7 * 24 * 60 * 60 * 1000) : null;
+        const daysLeft = consentDate ? Math.ceil((consentDate - new Date()) / (1000 * 60 * 60 * 24)) : null;
+        awards.push({
+          ocid: t.ocid,
+          title: t.title,
+          buyer_name: t.buyer_name,
+          category: t.category,
+          amount: t.amount,
+          award_date: pubDate,
+          consent_deadline: consentDate ? consentDate.toISOString() : null,
+          days_left_to_contact: daysLeft,
+          procurement_method: t.procurement_method,
+          department: t.department,
+          winner: raw.award && raw.award.suppliers ? raw.award.suppliers.map(s => s.name).join(', ') : null,
+        });
+      } catch(e) {}
+      if (awards.length >= limit) break;
+    }
+    res.json({ data: awards, total: awards.length });
   });
 
   app.post('/api/subscribe', (req, res) => {
