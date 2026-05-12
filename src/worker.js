@@ -44,7 +44,9 @@ async function run() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ tenders: batch }),
           });
-        } catch {}
+        } catch(e) {
+          console.error(`[WORKER] Sync fetch failed for ${url}:`, e.message);
+        }
       }
     }
     console.log('[WORKER] Sync complete');
