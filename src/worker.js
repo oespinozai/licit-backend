@@ -3,19 +3,21 @@ const db = require('./db');
 const { pollLatest } = require('./poller');
 const { processAlerts } = require('./alerts');
 
-const RAILWAY_API = process.env.RAILWAY_API_URL || 'http://localhost:3001';
+const SYNC_TARGETS = (process.env.SYNC_API_URLS || 'http://localhost:3001').split(',');
 
-async function syncToRailway(tenders) {
+async function syncToTargets(tenders) {
   if (!tenders || tenders.length === 0) return;
-  try {
-    const res = await fetch(`${RAILWAY_API}/api/tenders/bulk`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tenders }),
-    });
-    if (res.ok) console.log(`[SYNC] Pushed ${tenders.length} tenders to Railway`);
-  } catch (err) {
-    console.error('[SYNC] Failed:', err.message);
+  for (const url of SYNC_TARGETS) {
+    try {
+      const res = await fetch(`${url}/api/tenders/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenders }),
+      });
+      if (res.ok) console.log(`[SYNC] Pushed ${tenders.length} to ${url}`);
+    } catch (err) {
+      console.error(`[SYNC] Failed to push to ${url}:`, err.message);
+    }
   }
 }
 
@@ -30,7 +32,7 @@ async function run() {
     const tenders = await pollLatest();
     if (tenders.length > 0) {
       await processAlerts(tenders);
-      await syncToRailway(tenders);
+      await syncToTargets(tenders);
     }
   };
 
