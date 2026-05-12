@@ -47,6 +47,20 @@ async function main() {
     res.json({ message: 'Subscribed' });
   });
 
+  app.post('/api/tenders/bulk', express.json({ limit: '5mb' }), (req, res) => {
+    const { tenders } = req.body;
+    if (!tenders || !Array.isArray(tenders)) return res.status(400).json({ error: 'Invalid payload' });
+    let count = 0;
+    for (const t of tenders) {
+      db.run(`INSERT OR IGNORE INTO seen_tenders (ocid, source, title, buyer_name, category, amount, date_published, deadline, procurement_method, department, raw_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [t.ocid, t.source || 'SEACE V3', t.title, t.buyer_name, t.category,
+         t.amount, t.date_published, t.deadline, t.procurement_method, t.department, JSON.stringify(t)]);
+      count++;
+    }
+    res.json({ imported: count });
+  });
+
   app.post('/api/poll', async (req, res) => {
     const tenders = await pollLatest();
     await processAlerts(tenders);

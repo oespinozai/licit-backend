@@ -25,9 +25,12 @@ async function pollLatest() {
   console.log('[POLL] Fetching latest releases...');
   let page = 1;
   let newTenders = [];
+  const MAX_PAGES = 10;
+  const startTime = Date.now();
+  const TIMEOUT = 45000;
 
   try {
-    while (true) {
+    while (page <= MAX_PAGES && (Date.now() - startTime) < TIMEOUT) {
       const url = `${API_BASE}/releases?page=${page}&paginateBy=100`;
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 30000);
