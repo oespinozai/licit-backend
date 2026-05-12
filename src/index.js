@@ -89,11 +89,15 @@ async function main() {
     const priceId = PRICE_IDS[key];
     if (!priceId) return res.status(400).json({ error: 'Invalid plan/interval' });
 
+    // 7-day free trial for Pro plan
+    const trialDays = plan === 'pro' ? 7 : 0;
+
     try {
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
         line_items: [{ price: priceId, quantity: 1 }],
         customer_email: email || undefined,
+        subscription_data: trialDays > 0 ? { trial_period_days: trialDays } : undefined,
         success_url: success_url || 'https://oespinozai.github.io/licit/?success=true',
         cancel_url: cancel_url || 'https://oespinozai.github.io/licit/?canceled=true',
         metadata: { plan, interval: interval || 'monthly' },
