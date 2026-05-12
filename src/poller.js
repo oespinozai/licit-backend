@@ -29,7 +29,16 @@ async function pollLatest() {
   try {
     while (true) {
       const url = `${API_BASE}/releases?page=${page}&paginateBy=100`;
-      const res = await fetch(url);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      const res = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'application/json',
+        }
+      });
+      clearTimeout(timeout);
       if (!res.ok) {
         console.error(`[POLL] HTTP ${res.status} on page ${page}`);
         break;
